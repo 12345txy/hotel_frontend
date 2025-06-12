@@ -16,8 +16,11 @@
           <router-link to="/air-conditioning" class="nav-link">
             <font-awesome-icon icon="thermometer-half" class="mr-1" />空调控制
           </router-link>
-          <router-link to="/ac-management" class="nav-link">
+          <!-- <router-link to="/ac-management" class="nav-link">
             <font-awesome-icon icon="cogs" class="mr-1" />空调监控
+          </router-link> -->
+          <router-link to="/room-monitoring" class="nav-link">
+            <font-awesome-icon icon="tachometer-alt" class="mr-1" />监控面板
           </router-link>
           <router-link to="/about" class="nav-link">
             <font-awesome-icon icon="info-circle" class="mr-1" />关于

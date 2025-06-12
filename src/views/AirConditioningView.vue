@@ -28,6 +28,30 @@
             </div>
           </div>
         </div>
+
+        <!-- 加载状态指示器 -->
+        <div v-if="loading" class="bg-blue-50 p-4 rounded-md border border-blue-200 mb-6">
+          <div class="flex items-center">
+            <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
+            <p class="text-blue-700">正在处理请求...</p>
+          </div>
+        </div>
+
+        <!-- 错误信息显示 -->
+        <div v-if="error" class="bg-red-50 p-4 rounded-md border border-red-200 mb-6">
+          <div class="flex items-center">
+            <font-awesome-icon icon="exclamation-triangle" class="text-red-500 mr-3" />
+            <p class="text-red-700">{{ error }}</p>
+          </div>
+        </div>
+
+        <!-- 成功信息显示 -->
+        <div v-if="successMessage" class="bg-green-50 p-4 rounded-md border border-green-200 mb-6">
+          <div class="flex items-center">
+            <font-awesome-icon icon="check-circle" class="text-green-500 mr-3" />
+            <p class="text-green-700">{{ successMessage }}</p>
+          </div>
+        </div>
         
         <!-- 空调控制面板 -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -44,22 +68,27 @@
             <div class="flex items-center justify-between mb-4">
               <button 
                 @click="decreaseTemp" 
-                class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 hover:bg-blue-200 focus:outline-none"
-                :disabled="!acOn"
+                class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 hover:bg-blue-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="!acOn || loading || targetTemp <= 16"
               >
                 <font-awesome-icon icon="minus" />
               </button>
               <div class="text-5xl font-light text-gray-800">{{ targetTemp }}°C</div>
               <button 
                 @click="increaseTemp" 
-                class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-600 hover:bg-red-200 focus:outline-none"
-                :disabled="!acOn"
+                class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-600 hover:bg-red-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="!acOn || loading || targetTemp >= 30"
               >
                 <font-awesome-icon icon="plus" />
               </button>
             </div>
             <div class="flex justify-center">
-              <button @click="confirmTempChange" class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none" :disabled="!acOn || !tempChanged">
+              <button 
+                @click="confirmTempChange" 
+                class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed" 
+                :disabled="!acOn || !tempChanged || loading"
+              >
+                <font-awesome-icon icon="thermometer-half" class="mr-1" />
                 确认调温
               </button>
             </div>
@@ -73,19 +102,20 @@
             <h3 class="text-lg font-semibold text-gray-700 mb-4">风速控制</h3>
             <div class="flex space-x-2">
               <button 
-                v-for="speed in ['LOW', 'MEDIUM', 'HIGH']" 
+                v-for="speed in ['L', 'M', 'H']" 
                 :key="speed"
                 @click="setFanSpeed(speed)"
-                :disabled="!acOn"
+                :disabled="!acOn || loading"
                 :class="[
                   'flex-1 py-3 rounded-md text-sm font-medium transition-colors',
                   acOn && fanSpeed === speed
                     ? 'bg-blue-600 text-white' 
-                    : !acOn
+                    : !acOn || loading
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                       : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
                 ]"
               >
+                <font-awesome-icon icon="wind" class="mr-1" />
                 {{ getFanSpeedLabel(speed) }}
               </button>
             </div>
@@ -99,8 +129,9 @@
                 <span class="text-gray-700">空调状态</span>
                 <button 
                   @click="toggleAC"
+                  :disabled="loading"
                   :class="[
-                    'relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500',
+                    'relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed',
                     acOn ? 'bg-blue-600' : 'bg-gray-200'
                   ]"
                 >
@@ -120,13 +151,13 @@
               <label class="block text-sm font-medium text-gray-700 mb-1">模式选择</label>
               <div class="grid grid-cols-2 gap-2">
                 <button 
-                  @click="setMode('COOLING')" 
-                  :disabled="!acOn"
+                  @click="setMode('制冷模式')" 
+                  :disabled="!acOn || loading"
                   :class="[
                     'py-2 px-3 rounded-md text-sm flex items-center justify-center transition-colors',
-                    acOn && mode === 'COOLING' 
+                    acOn && mode === '制冷模式' 
                       ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                      : !acOn
+                      : !acOn || loading
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                         : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
                   ]"
@@ -135,13 +166,13 @@
                   制冷
                 </button>
                 <button 
-                  @click="setMode('HEATING')" 
-                  :disabled="!acOn"
+                  @click="setMode('制热模式')" 
+                  :disabled="!acOn || loading"
                   :class="[
                     'py-2 px-3 rounded-md text-sm flex items-center justify-center transition-colors',
-                    acOn && mode === 'HEATING' 
+                    acOn && mode === '制热模式' 
                       ? 'bg-red-100 text-red-700 border border-red-200' 
-                      : !acOn
+                      : !acOn || loading
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                         : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
                   ]"
@@ -179,7 +210,8 @@
         <div class="flex justify-between">
           <button 
             @click="turnOffAC" 
-            class="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none"
+            :disabled="loading"
+            class="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <font-awesome-icon icon="power-off" class="mr-1" /> 
             关闭空调
@@ -199,6 +231,8 @@
 </template>
 
 <script>
+import axios from 'axios'
+
 export default {
   name: 'AirConditioningView',
   data() {
@@ -209,13 +243,16 @@ export default {
       targetTemp: 25,
       initialTargetTemp: 25,
       tempChanged: false,
-      mode: 'COOLING',
-      fanSpeed: 'MEDIUM',
+      mode: '制冷模式',
+      fanSpeed: 'M',
       startTime: null,
       totalRunningTime: 0,
       totalCost: 0,
       usageLog: [],
-      timer: null
+      timer: null,
+      loading: false,
+      error: null,
+      successMessage: null
     }
   },
   created() {
@@ -233,130 +270,268 @@ export default {
   beforeDestroy() {
     // 清除定时器
     clearInterval(this.timer);
+    this.clearMessages();
   },
   methods: {
+    clearMessages() {
+      this.error = null;
+      this.successMessage = null;
+    },
+
+    showMessage(message, type = 'success') {
+      this.clearMessages();
+      if (type === 'error') {
+        this.error = message;
+      } else {
+        this.successMessage = message;
+      }
+      
+      // 3秒后自动清除消息
+      setTimeout(() => {
+        this.clearMessages();
+      }, 3000);
+    },
+
     async getACStatus() {
       try {
-        // 调用API获取空调状态
-        // 实际项目中应该使用axios或fetch调用后端API
-        // const response = await fetch(`/api/ac/${this.currentRoom}`);
-        // const data = await response.json();
+        this.loading = true;
+        // 获取房间状态 - 根据API接口调用
+        const response = await axios.get(`/api/monitor/roomstatus`);
+        const roomData = response.data.find(room => room.roomId === parseInt(this.currentRoom));
         
-        // 模拟API调用
-        setTimeout(() => {
-          // 模拟随机的空调状态
-          const randomData = {
-            isOn: Math.random() > 0.5,
-            currentTemp: Math.floor(22 + Math.random() * 6),
-            targetTemp: 25,
-            mode: Math.random() > 0.5 ? 'COOLING' : 'HEATING',
-            fanSpeed: ['LOW', 'MEDIUM', 'HIGH'][Math.floor(Math.random() * 3)],
-            runningTime: Math.floor(Math.random() * 3600) // 秒数
-          };
-          
-          this.acOn = randomData.isOn;
-          this.currentTemp = randomData.currentTemp;
-          this.targetTemp = randomData.targetTemp;
-          this.initialTargetTemp = randomData.targetTemp;
-          this.mode = randomData.mode;
-          this.fanSpeed = randomData.fanSpeed;
-          this.totalRunningTime = randomData.runningTime;
+        if (roomData) {
+          this.acOn = roomData.acon;
+          this.currentTemp = roomData.currentTemp;
+          this.targetTemp = roomData.targetTemp;
+          this.initialTargetTemp = roomData.targetTemp;
+          this.mode = roomData.mode;
+          this.fanSpeed = roomData.fanSpeed;
           
           if (this.acOn) {
-            this.startTime = new Date(Date.now() - this.totalRunningTime * 1000);
+            this.startTime = new Date();
             this.calculateCost();
           }
-        }, 500);
+        }
       } catch (error) {
         console.error('获取空调状态失败:', error);
+        this.showMessage('获取空调状态失败，请刷新页面重试', 'error');
+      } finally {
+        this.loading = false;
       }
     },
+
     async toggleAC() {
-      if (this.acOn) {
-        this.acOn = false;
-        this.startTime = null;
-      } else {
-        this.acOn = true;
-        this.startTime = new Date();
+      if (this.loading) return;
+      
+      try {
+        this.loading = true;
+        this.clearMessages();
+
+        if (this.acOn) {
+          // 关闭空调
+          this.acOn = false;
+          this.startTime = null;
+          this.showMessage('空调已关闭');
+        } else {
+          // 开启空调 - 调用开机接口
+          const response = await axios.post(`/api/ac/room/${this.currentRoom}/start`);
+          
+          if (response.status === 200) {
+            this.acOn = true;
+            this.startTime = new Date();
+            this.showMessage(response.data.message || '空调已开启');
+          }
+          console.log("response:", response)
+        }
+      } catch (error) {
+        console.error('空调开关操作失败:', error);
+        if (error.response && error.response.data && error.response.data.message) {
+          this.showMessage(error.response.data.message, 'error');
+        } else {
+          this.showMessage('空调操作失败，请重试', 'error');
+        }
+      } finally {
+        this.loading = false;
       }
-      console.log(`房间 ${this.currentRoom} 空调已${this.acOn ? '开启' : '关闭'}`);
     },
+
     decreaseTemp() {
-      if (this.acOn && this.targetTemp > 16) {
+      if (this.acOn && this.targetTemp > 16 && !this.loading) {
         this.targetTemp -= 1;
         this.tempChanged = true;
       }
     },
+
     increaseTemp() {
-      if (this.acOn && this.targetTemp < 30) {
+      if (this.acOn && this.targetTemp < 30 && !this.loading) {
         this.targetTemp += 1;
         this.tempChanged = true;
       }
     },
-    confirmTempChange() {
-      if (this.acOn && this.tempChanged) {
-        // 调用API确认温度变化
-        console.log(`房间 ${this.currentRoom} 目标温度改为: ${this.targetTemp}°C`);
+
+    async confirmTempChange() {
+      if (!this.acOn || !this.tempChanged || this.loading) return;
+      
+      try {
+        this.loading = true;
+        this.clearMessages();
+
+        // 调用调温接口
+        const response = await axios.put(`/api/ac/room/${this.currentRoom}/temp`, null, {
+          params: {
+            targetTemp: this.targetTemp
+          }
+        });
+
+        if (response.status === 200) {
+          this.tempChanged = false;
+          this.initialTargetTemp = this.targetTemp;
+          this.showMessage(response.data.message || `目标温度已调整为 ${this.targetTemp}°C`);
+        }
+      } catch (error) {
+        console.error('调温失败:', error);
+        // 恢复原来的温度
+        this.targetTemp = this.initialTargetTemp;
         this.tempChanged = false;
+        
+        if (error.response && error.response.data && error.response.data.message) {
+          this.showMessage(error.response.data.message, 'error');
+        } else {
+          this.showMessage('调温失败，请重试', 'error');
+        }
+      } finally {
+        this.loading = false;
       }
     },
-    setFanSpeed(speed) {
-      if (this.acOn) {
-        this.fanSpeed = speed;
-        console.log(`房间 ${this.currentRoom} 风速改为: ${this.getFanSpeedLabel(speed)}`);
+
+    async setFanSpeed(speed) {
+      if (!this.acOn || this.loading) return;
+      
+      if (this.fanSpeed === speed) return; // 如果是相同的风速，不需要调用接口
+      
+      try {
+        this.loading = true;
+        this.clearMessages();
+
+        // 调用调风接口
+        const response = await axios.put(`/api/ac/room/${this.currentRoom}/fanspeed`, null, {
+          params: {
+            fanSpeed: speed
+          }
+        });
+
+        if (response.status === 200) {
+          this.fanSpeed = speed;
+          this.showMessage(response.data.message || `风速已调整为${this.getFanSpeedLabel(speed)}`);
+        }
+      } catch (error) {
+        console.error('调风失败:', error);
+        if (error.response && error.response.data && error.response.data.message) {
+          this.showMessage(error.response.data.message, 'error');
+        } else {
+          this.showMessage('风速调节失败，请重试', 'error');
+        }
+      } finally {
+        this.loading = false;
       }
     },
+
     setMode(mode) {
-      if (this.acOn) {
+      if (this.acOn && !this.loading) {
         this.mode = mode;
-        console.log(`房间 ${this.currentRoom} 空调模式改为: ${this.getModeLabel(mode)}`);
+        this.showMessage(`空调模式已切换为${mode}`);
       }
     },
+
     getModeLabel(mode) {
-      const modes = {
-        'COOLING': '制冷',
-        'HEATING': '制热'
-      };
-      return modes[mode] || mode;
+      return mode;
     },
+
     getFanSpeedLabel(speed) {
       const speeds = {
-        'LOW': '低速',
-        'MEDIUM': '中速',
-        'HIGH': '高速'
+        'L': '低速',
+        'M': '中速',
+        'H': '高速'
       };
       return speeds[speed] || speed;
     },
+
     formatRunningTime() {
+      if (!this.startTime) return '00:00:00';
+      
       const now = new Date();
       const runningTime = Math.floor((now - this.startTime) / 1000);
       return this.formatTime(runningTime);
     },
+
     formatTime(seconds) {
       const hours = Math.floor(seconds / 3600);
       const minutes = Math.floor((seconds % 3600) / 60);
       const remainingSeconds = seconds % 60;
       return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
     },
+
     calculateCost() {
+      if (!this.startTime) return;
+      
       const now = new Date();
-      const runningTime = Math.floor((now - this.startTime) / 1000);
-      this.totalRunningTime += runningTime;
-      this.totalCost = (runningTime / 3600) * this.getFanSpeedRate();
+      const runningTimeHours = (now - this.startTime) / (1000 * 60 * 60);
+      this.totalCost = runningTimeHours * this.getFanSpeedRate();
     },
+
     getFanSpeedRate() {
-      // 实现获取风速费率的逻辑
-      return 0.5; // 临时返回值，实际项目中应该根据风速计算费率
+      const rates = {
+        'L': 0.5,
+        'M': 1.0,
+        'H': 1.5
+      };
+      return rates[this.fanSpeed] || 1.0;
     },
-    turnOffAC() {
-      if (this.acOn) {
-        this.acOn = false;
-        console.log(`房间 ${this.currentRoom} 空调关闭`);
-      }
+
+    async turnOffAC() {
+      if (!this.acOn || this.loading) return;
+      
+      await this.toggleAC();
     },
+
     updateRunningTime() {
-      // 实现更新运行时间的逻辑
+      if (this.acOn && this.startTime) {
+        this.calculateCost();
+      }
     }
   }
 }
-</script> 
+</script>
+
+<style scoped>
+.air-conditioning-page {
+  min-height: 100vh;
+  background-color: #f7fafc;
+  padding: 20px;
+}
+
+/* 加载动画 */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* 按钮禁用状态 */
+.disabled\:opacity-50:disabled {
+  opacity: 0.5;
+}
+
+.disabled\:cursor-not-allowed:disabled {
+  cursor: not-allowed;
+}
+
+/* 过渡动画 */
+.transition-colors {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+</style> 
