@@ -25,8 +25,8 @@
             <div class="flex justify-between items-center mb-2">
               <h3 class="text-lg font-semibold">房间 {{ room.roomId }}</h3>
               <div class="flex items-center space-x-1">
-                <div class="w-3 h-3 rounded-full" :class="room.acon ? 'bg-green-500' : 'bg-gray-400'"></div>
-                <span class="text-xs">{{ room.acon ? '开启' : '关闭' }}</span>
+                <div class="w-3 h-3 rounded-full" :class="room.acOn ? 'bg-green-500' : 'bg-gray-400'"></div>
+                <span class="text-xs">{{ room.acOn ? '开启' : '关闭' }}</span>
               </div>
             </div>
 
@@ -166,7 +166,7 @@
           // 处理队列状态数据
           const queueData = queueResponse.data || {}
           this.waitingQueue = queueData.waitingQueue || []
-          this.serviceQueue = queueData.serviceQueue || []
+          this.serviceQueue = queueData.servingQueue || []
 
           this.isConnected = true
           this.lastUpdateTime = new Date().toLocaleTimeString()

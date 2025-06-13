@@ -73,7 +73,14 @@
               >
                 <font-awesome-icon icon="minus" />
               </button>
-              <div class="text-5xl font-light text-gray-800">{{ targetTemp }}°C</div>
+              <div 
+                :class="[
+                  'font-light text-gray-800',
+                  targetTemp === '空调未连接' ? 'text-4xl' : 'text-5xl'
+                ]"
+              >
+                {{ targetTemp }}{{ targetTemp !== '空调未连接' ? '°C' : '' }}
+              </div>
               <button 
                 @click="increaseTemp" 
                 class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-600 hover:bg-red-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
@@ -191,16 +198,16 @@
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="bg-gray-50 p-3 rounded-md">
               <div class="text-sm text-gray-500">运行时间</div>
-              <div class="text-xl font-medium">{{ formatRunningTime() }}</div>
+              <div class="text-xl font-medium">{{ formatRunningTime(roomDetail.time) }}</div>
             </div>
             <div class="bg-gray-50 p-3 rounded-md">
               <div class="text-sm text-gray-500">累计费用</div>
-              <div class="text-xl font-medium text-red-600">¥{{ totalCost.toFixed(2) }}</div>
+              <div class="text-xl font-medium text-red-600">¥{{ roomDetail.fee || 0 }}</div>
             </div>
             <div class="bg-gray-50 p-3 rounded-md">
               <div class="text-sm text-gray-500">当前费率</div>
               <div class="text-xl font-medium">
-                ¥{{ getFanSpeedRate() }}/小时
+                ¥{{ getFanSpeedRate() }}/分钟
               </div>
             </div>
           </div>
@@ -210,7 +217,7 @@
         <div class="flex justify-between">
           <button 
             @click="turnOffAC" 
-            :disabled="loading"
+            :disabled="!acOn || loading"
             class="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <font-awesome-icon icon="power-off" class="mr-1" /> 
@@ -243,16 +250,21 @@ export default {
       targetTemp: 25,
       initialTargetTemp: 25,
       tempChanged: false,
-      mode: '制冷模式',
+      mode: 'COOLING',
       fanSpeed: 'M',
       startTime: null,
       totalRunningTime: 0,
       totalCost: 0,
       usageLog: [],
       timer: null,
+      monitorTimer: null,
       loading: false,
       error: null,
-      successMessage: null
+      successMessage: null,
+      roomDetail: {
+        time: 0,
+        fee: 0
+      }
     }
   },
   created() {
@@ -262,14 +274,27 @@ export default {
     // 如果有房间号，则获取空调状态
     if (this.currentRoom) {
       this.getACStatus();
+      this.getRoomDetail();
     }
     
-    // 启动定时器，每秒更新一次
-    this.timer = setInterval(this.updateRunningTime, 1000);
+    // 启动定时器，每5秒更新一次房间详情
+    this.timer = setInterval(() => {
+      if (this.currentRoom) {
+        this.getRoomDetail();
+      }
+    }, 5000);
+
+    // 启动monitor定时器，每5秒更新一次monitor状态
+    this.monitorTimer = setInterval(() => {
+      if (this.currentRoom) {
+        this.getACStatus();
+      }
+    }, 5000);
   },
   beforeDestroy() {
     // 清除定时器
     clearInterval(this.timer);
+    clearInterval(this.monitorTimer);
     this.clearMessages();
   },
   methods: {
@@ -294,13 +319,12 @@ export default {
 
     async getACStatus() {
       try {
-        this.loading = true;
         // 获取房间状态 - 根据API接口调用
         const response = await axios.get(`/api/monitor/roomstatus`);
         const roomData = response.data.find(room => room.roomId === parseInt(this.currentRoom));
         
         if (roomData) {
-          this.acOn = roomData.acon;
+          this.acOn = roomData.acOn;
           this.currentTemp = roomData.currentTemp;
           this.targetTemp = roomData.targetTemp;
           this.initialTargetTemp = roomData.targetTemp;
@@ -309,14 +333,32 @@ export default {
           
           if (this.acOn) {
             this.startTime = new Date();
-            this.calculateCost();
           }
         }
       } catch (error) {
         console.error('获取空调状态失败:', error);
-        this.showMessage('获取空调状态失败，请刷新页面重试', 'error');
-      } finally {
-        this.loading = false;
+        // 静默处理错误，避免频繁提示
+      }
+    },
+
+    async getRoomDetail() {
+      try {
+        // 调用房间详情接口
+        const response = await axios.get(`/api/ac/room/${this.currentRoom}/detail`);
+        
+        if (response.data) {
+          // console.log("response.data:", response.data)
+          // console.log("response.data.time:", response.data.Time)
+          // console.log("response.data.fee:", response.data.Fee)
+          this.roomDetail = {
+            time: response.data.Time || 0,
+            fee: response.data.Fee || 0
+          };
+          console.log("this.roomDetail:", this.roomDetail)
+        }
+      } catch (error) {
+        console.error('获取房间详情失败:', error);
+        // 不显示错误消息，避免频繁提示
       }
     },
 
@@ -328,10 +370,16 @@ export default {
         this.clearMessages();
 
         if (this.acOn) {
-          // 关闭空调
-          this.acOn = false;
-          this.startTime = null;
-          this.showMessage('空调已关闭');
+          // 关闭空调 - 调用关机接口
+          const response = await axios.post(`/api/ac/room/${this.currentRoom}/stop`);
+          
+          if (response.status === 200) {
+            this.acOn = false;
+            this.startTime = null;
+            this.showMessage(response.data.message || '空调已关闭');
+            // 刷新房间详情
+            this.getRoomDetail();
+          }
         } else {
           // 开启空调 - 调用开机接口
           const response = await axios.post(`/api/ac/room/${this.currentRoom}/start`);
@@ -340,6 +388,8 @@ export default {
             this.acOn = true;
             this.startTime = new Date();
             this.showMessage(response.data.message || '空调已开启');
+            // 刷新房间详情
+            this.getRoomDetail();
           }
           console.log("response:", response)
         }
@@ -387,6 +437,8 @@ export default {
           this.tempChanged = false;
           this.initialTargetTemp = this.targetTemp;
           this.showMessage(response.data.message || `目标温度已调整为 ${this.targetTemp}°C`);
+          // 刷新房间详情
+          this.getRoomDetail();
         }
       } catch (error) {
         console.error('调温失败:', error);
@@ -414,7 +466,7 @@ export default {
         this.clearMessages();
 
         // 调用调风接口
-        const response = await axios.put(`/api/ac/room/${this.currentRoom}/fanspeed`, null, {
+        const response = await axios.put(`/api/ac/room/${this.currentRoom}/speed`, null, {
           params: {
             fanSpeed: speed
           }
@@ -423,6 +475,8 @@ export default {
         if (response.status === 200) {
           this.fanSpeed = speed;
           this.showMessage(response.data.message || `风速已调整为${this.getFanSpeedLabel(speed)}`);
+          // 刷新房间详情
+          this.getRoomDetail();
         }
       } catch (error) {
         console.error('调风失败:', error);
@@ -456,34 +510,17 @@ export default {
       return speeds[speed] || speed;
     },
 
-    formatRunningTime() {
-      if (!this.startTime) return '00:00:00';
+    formatRunningTime(totalMinutes) {
+      if (!totalMinutes || totalMinutes === 0) return '0分钟';
       
-      const now = new Date();
-      const runningTime = Math.floor((now - this.startTime) / 1000);
-      return this.formatTime(runningTime);
-    },
-
-    formatTime(seconds) {
-      const hours = Math.floor(seconds / 3600);
-      const minutes = Math.floor((seconds % 3600) / 60);
-      const remainingSeconds = seconds % 60;
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-    },
-
-    calculateCost() {
-      if (!this.startTime) return;
-      
-      const now = new Date();
-      const runningTimeHours = (now - this.startTime) / (1000 * 60 * 60);
-      this.totalCost = runningTimeHours * this.getFanSpeedRate();
+      return `${totalMinutes}分钟`;
     },
 
     getFanSpeedRate() {
       const rates = {
-        'L': 0.5,
-        'M': 1.0,
-        'H': 1.5
+        'L': 0.33,
+        'M': 0.5,
+        'H': 1.0
       };
       return rates[this.fanSpeed] || 1.0;
     },
@@ -491,12 +528,29 @@ export default {
     async turnOffAC() {
       if (!this.acOn || this.loading) return;
       
-      await this.toggleAC();
-    },
+      try {
+        this.loading = true;
+        this.clearMessages();
 
-    updateRunningTime() {
-      if (this.acOn && this.startTime) {
-        this.calculateCost();
+        // 调用关机接口
+        const response = await axios.post(`/api/ac/room/${this.currentRoom}/stop`);
+        
+        if (response.status === 200) {
+          this.acOn = false;
+          this.startTime = null;
+          this.showMessage(response.data.message || '空调已关闭');
+          // 刷新房间详情
+          this.getRoomDetail();
+        }
+      } catch (error) {
+        console.error('关闭空调失败:', error);
+        if (error.response && error.response.data && error.response.data.message) {
+          this.showMessage(error.response.data.message, 'error');
+        } else {
+          this.showMessage('关闭空调失败，请重试', 'error');
+        }
+      } finally {
+        this.loading = false;
       }
     }
   }
@@ -534,4 +588,4 @@ export default {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
 }
-</style> 
+</style>

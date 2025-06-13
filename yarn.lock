@@ -3723,6 +3723,7 @@ hosted-git-info@^2.1.4:
     "@fortawesome/free-regular-svg-icons" "^6.7.2"
     "@fortawesome/free-solid-svg-icons" "^6.7.2"
     "@fortawesome/vue-fontawesome" "^2.0.10"
+    axios "^1.9.0"
     core-js "^3.8.3"
     hotel_frontend "file:"
     vue "^2.6.14"
